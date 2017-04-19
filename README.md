@@ -36,7 +36,7 @@ var client = new Swagger({
 });
 ```
 
-NOTE: we're explicitly setting the responseContentType, because we don't want you getting stuck when 
+NOTE: we're explicitly setting the responseContentType, because we don't want you getting stuck when
 there is more than one content type available.
 
 That's it!  You'll get a JSON response with the default callback handler:
@@ -106,17 +106,50 @@ new Swagger({
     });
 });
 ```
+### Authorization
 
-Need to pass an API key?  Configure one in your client instance as a query string:
+Need to pass an API key? Ok, lets do it for this sample `swagger.yml`:
 
-```js
-client.clientAuthorizations.add("apiKey", new Swagger.ApiKeyAuthorization("api_key","special-key","query"));
+```yaml
+# ...
+
+securityDefinitions:
+
+  api_scheme_name:           # swagger scheme name
+    type: apiKey            # swagger type (one of "basic", "apiKey" or "oauth2")
+    name: queryParamName    # The name of the header or query parameter to be used
+    in: query               # location of the API key
+
+  api_scheme_name_2:
+    type: apiKey
+    name: X-KEY-PARAM
+    in: header
+
+# ...
 ```
 
-...or with a header:
+Configure auth for that definition in your client instance as a *query string*:
 
 ```js
-client.clientAuthorizations.add("apiKey", new Swagger.ApiKeyAuthorization("api_key","special-key","header"));
+client.clientAuthorizations.add("api_scheme_name",
+  new Swagger.ApiKeyAuthorization(
+    "queryParamName",
+    "<YOUR-SECRET-KEY>",
+    "query"
+  )
+);
+```
+
+...or with a *header*:
+
+```js
+client.clientAuthorizations.add("api_scheme_name_2",
+  new Swagger.ApiKeyAuthorization(
+    "X-KEY-PARAM",
+    "<YOUR-SECRET-KEY>",
+    "header"
+  )
+);
 ```
 
 ...or with the swagger-client constructor:
@@ -299,8 +332,25 @@ var client = new SwaggerClient({
 });
 ```
 
+You can also pass in your own version superagent (if, for example, you have other superagent plugins etc that you want to use)
+
+```js
+var agent = require('some-other-special-superagent');
+
+var client = new SwaggerClient({
+  spec: petstoreRaw,
+  requestAgent: agent,
+  success: function () {
+    client.pet.getPetById({petId: 3}, function(data){
+      expect(data).toBe('ok');
+      done();
+    });
+  }
+});
+```
+
 ### Using custom http(s) agent
-In case if you need to sign all requests to petstore with custom certificate 
+In case if you need to sign all requests to petstore with custom certificate
 
 ```js
 var connectionAgent = {

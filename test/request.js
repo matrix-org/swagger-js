@@ -365,6 +365,12 @@ describe('swagger request functions', function () {
       expect(resp.headers['content-type']).toNotBe(undefined);
       expect(resp.headers['content-type']).toBe('text/plain');
 
+      done('should have failed');
+    }, function(err) {
+      expect(err.headers).toNotBe(undefined);
+      expect(err.headers['content-type']).toNotBe(undefined);
+      expect(err.headers['content-type']).toBe('text/plain');
+
       done();
     });
   });
@@ -502,6 +508,19 @@ describe('swagger basePath override functions', function () {
       expect(err.obj.message).toBe('sorry!');
       done();
     });
+  });
+
+  it('applies a request interceptor to asCurl #903', function() {
+    var petApi = sample.pet;
+    var requestInterceptor = {
+      apply: function(data) {
+        data.url = 'http://localhost:8000/v2/api/pet/1';
+        return data;
+      }
+    };
+
+    var curl = petApi.getPetById.asCurl({petId: -100}, {requestInterceptor: requestInterceptor});
+    expect(curl).toBe('curl -X GET --header \'Accept: application/json\' \'http://localhost:8000/v2/api/pet/1\'');
   });
 
   it('applies request interceptor and waits for beforeSend as per #701', function(done) {

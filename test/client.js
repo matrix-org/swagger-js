@@ -1405,6 +1405,23 @@ describe('SwaggerClient', function () {
     });
   });
 
+  it('should catch an error', function(done) {
+    new SwaggerClient({
+      url: 'http://localhost:8000/v2/issue-716.yaml',
+      usePromise: true
+    }).then(function(client) {
+      client.Data.getPets()
+        .then(function(data) {
+          done('shoulda failed');
+        })
+        .catch(function(err) {
+          done();
+        })
+    }).catch(function(exception) {
+      done(exception);
+    });
+  });
+
   it('should read a blob', function(done) {
     var spec = {
       paths: {
@@ -1451,6 +1468,42 @@ describe('SwaggerClient', function () {
         });
     }).catch(function(exception) {
       done(exception);
+    });
+  });
+
+  it('should keep password format', function(done) {
+    var spec = {
+      schemes: ['https'],
+      paths: {
+        '/v2/nada': {
+          get: {
+            operationId: 'getNothing',
+            tags: [ 'test' ],
+            parameters: [{
+              in: 'query',
+              name: 'password',
+              type: 'string',
+              format: 'password',
+              required: true
+            }],
+            responses: {
+              default: {
+                description: 'ok'
+              }
+            }
+          }
+        }
+      }
+    };
+
+    new SwaggerClient({
+      url: 'http://localhost:8000',
+      spec: spec,
+      usePromise: true
+    }).then(function(client) {
+      expect(client.apis.test.operations.getNothing.parameters[0].format).toBe('password');
+      expect(client.apis.test.operations.getNothing.asCurl({password: 'hidden!'})).toBe('curl -X GET --header \'Accept: application/json\' \'https://localhost:8000/v2/nada?password=******\'');
+      done();
     });
   });
 
@@ -1529,5 +1582,178 @@ describe('SwaggerClient', function () {
     }).catch(function(exception) {
       done(exception);
     });
+  });
+
+  it('honors allowEmptyValue #825', function(done) {
+    var spec = {
+      basePath: '/double/',
+      paths: {
+        '/foo': {
+          get: {
+            tags: [
+              'test'
+            ],
+            operationId: 'slash',
+            parameters: [{
+              in: 'query',
+              allowEmptyValue: true,
+              name: 'happy',
+              type: 'string',
+              required: false
+            }],
+          }
+        }
+      }
+    };
+    new SwaggerClient({
+      url: 'http://localhost:8000/v2/swagger.json',
+      spec: spec,
+      usePromise: true
+    }).then(function(client) {
+      var mock = client.test.slash({}, {mock: true});
+      expect(mock.url).toBe('http://localhost:8000/double/foo?happy=');
+
+      done();
+    }).catch(function(exception) {
+      done(exception);
+    });
+  });
+
+
+  it('doesnt remove 0 from query params', function(done) {
+    var spec = {
+      basePath: '/double/',
+      paths: {
+        '/foo': {
+          get: {
+            tags: [
+              'test'
+            ],
+            operationId: 'slash',
+            parameters: [{
+              in: 'query',
+              name: 'bar',
+              type: 'integer',
+              required: false
+            }],
+          }
+        }
+      }
+    };
+    new SwaggerClient({
+      url: 'http://localhost:8000/v2/swagger.json',
+      spec: spec,
+      usePromise: true
+    }).then(function(client) {
+      var mock = client.test.slash({bar: 0}, {mock: true});
+      expect(mock.url).toBe('http://localhost:8000/double/foo?bar=0');
+
+      done();
+    }).catch(function(exception) {
+      done(exception);
+    });
+  });
+
+  it('honors allowEmptyValue #825 in arrays', function(done) {
+    var spec = {
+      basePath: '/double/',
+      paths: {
+        '/foo': {
+          get: {
+            tags: [
+              'test'
+            ],
+            operationId: 'slash',
+            parameters: [{
+              in: 'query',
+              allowEmptyValue: true,
+              name: 'happy',
+              type: 'array',
+              items: {
+                type: 'string'
+              },
+              required: false
+            }],
+          }
+        }
+      }
+    };
+    new SwaggerClient({
+      url: 'http://localhost:8000/v2/swagger.json',
+      spec: spec,
+      usePromise: true
+    }).then(function(client) {
+      var mock = client.test.slash({}, {mock: true});
+      expect(mock.url).toBe('http://localhost:8000/double/foo?happy=');
+      done();
+    }).catch(function(exception) {
+      done(exception);
+    });
+  });
+
+  it('passes data in a delete with formData', function(done) {
+
+    var spec = {
+      paths: {
+        '/foo': {
+          delete: {
+            tags: [
+              'test'
+            ],
+            operationId: 'removeMe',
+            consumes: [
+                'x-www-form-urlencoded'
+            ],
+            parameters: [{
+              in: 'formData',
+              name: 'username',
+              type: 'string',
+              required: false
+            }],
+          }
+        }
+      }
+    };
+    new SwaggerClient({
+      url: 'http://localhost:8000/v2/swagger.json',
+      spec: spec,
+      usePromise: true
+    }).then(function(client) {
+      var mock = client.test.removeMe({username: 'Tony'}, {mock: true});
+      expect(mock.body).toBe('username=Tony');
+      expect(mock.headers['Content-Type']).toBe('application/x-www-form-urlencoded');
+      done();
+    }).catch(function(exception) {
+      done(exception);
+    });
+  })
+
+  it('verifies a 201 response #820', function(done) {
+    new SwaggerClient({
+      spec: petstoreRaw,
+      usePromise: true
+    }).then(function (client) {
+      return client.pet.getPetById({petId: 777})
+    }).then(function (data) {
+      expect(data.status).toBe(201);
+      done();
+    }).catch(function(err) {
+      done('oops');
+    })
+  });
+
+  it('verifies a 400 response #820', function(done) {
+    new SwaggerClient({
+      spec: petstoreRaw,
+      usePromise: true
+    }).then(function (client) {
+      return client.pet.getPetById({petId: 666})
+    }).then(function (data) {
+      done('expected an error');
+    }).catch(function(err) {
+      expect(err.status).toBe(400);
+      expect(err.obj).toEqual({code: 400, message: 'sorry!', type: 'bad input'});
+      done();
+    })
   });
 });
